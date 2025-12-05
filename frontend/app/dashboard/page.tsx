@@ -41,19 +41,14 @@ const Dashboard = () => {
                 Баланс за период: {balance} ₽
             </div>
             <div className='flex flex-1 w-full gap-4'>
-                <div className='flex-2 border bg-pink-50 h-64 flex flex-col items-center justify-start p-4 overflow-y-auto rounded'>
+                <div className='flex-2 border bg-pink-50 h-64 flex flex-col items-center justify-start p-4 rounded'>
                     <div className='mb-4 text-center font-semibold'>
                         Список последних 5 транзакций за период
                     </div>
-                    <ul className='space-y-2 w-full'>
+                    <ul className='space-y-2 w-full overflow-y-auto'>
                         {recentTransactions && recentTransactions.map((tx, index) => (
                             <li key={index} className='p-2 bg-white border rounded'>{tx}</li>
                         ))}
-                        <li className='p-2 bg-white border rounded'>Транзакция 1</li>
-                        <li className='p-2 bg-white border rounded'>Транзакция 2</li>
-                        <li className='p-2 bg-white border rounded'>Транзакция 3</li>
-                        <li className='p-2 bg-white border rounded'>Транзакция 4</li>
-                        <li className='p-2 bg-white border rounded'>Транзакция 5</li>
                     </ul>
                 </div>
                 <div className='flex-4 border bg-orange-50 h-64 flex items-center justify-center p-4 rounded'>
