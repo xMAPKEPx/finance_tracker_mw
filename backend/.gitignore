@@ -1,0 +1,9 @@
+﻿# .NET Backend
+bin/
+obj/
+.vs/
+[Dd]ebug/
+[Rr]elease/
+*.db
+appsettings.Development.json
+.idea/
