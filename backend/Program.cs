@@ -17,6 +17,11 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader();
     });
 });
+// HttpClient для proverkacheka
+builder.Services.AddHttpClient("Proverkacheka");
+
+    // Наш сервис для чеков
+builder.Services.AddScoped<IReceiptService, ReceiptService>();
 
 var app = builder.Build();
 
