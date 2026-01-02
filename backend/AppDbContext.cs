@@ -8,4 +8,5 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users { get; set; } = null!;
     public DbSet<Receipt> Receipts { get; set; } = null!;
+    public DbSet<ReceiptItem> ReceiptItems { get; set; } = null!;
 }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
+
 public class ParseReceiptRequest
 {
     public int UserId { get; set; }      // пока просто числом
@@ -38,5 +39,13 @@ public class ReceiptsController : ControllerBase
 
         return receipts;
     }
-    
+    [HttpPost("debug-raw")]
+    public async Task<ActionResult<string>> DebugRaw([FromBody] ParseReceiptRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.QrRaw))
+            return BadRequest("QrRaw is required.");
+
+        var json = await _receiptService.GetRawFromProverkachekaAsync(request.QrRaw, ct);
+        return Content(json, "application/json");
+    }
 }
