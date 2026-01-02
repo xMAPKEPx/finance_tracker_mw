@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using backend;
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Добавляем контроллеры
@@ -20,6 +22,12 @@ builder.Services.AddCors(options =>
 // HttpClient для proverkacheka
 builder.Services.AddHttpClient("Proverkacheka");
 
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    options.UseSqlite(connectionString);
+});
+
     // Наш сервис для чеков
 builder.Services.AddScoped<IReceiptService, ReceiptService>();
 
@@ -35,5 +43,6 @@ app.UseSwaggerUI();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+using (var scope = app.Services.CreateScope())
 
 app.Run();
