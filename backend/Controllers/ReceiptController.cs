@@ -1,15 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 
-public class ParseReceiptRequest
-{
-    public int UserId { get; set; }      // пока просто числом
-    public string QrRaw { get; set; } = null!;
-}
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ReceiptsController : ControllerBase
 {
     private readonly IReceiptService _receiptService;
@@ -18,14 +16,17 @@ public class ReceiptsController : ControllerBase
     {
         _receiptService = receiptService;
     }
-
+    
     [HttpPost("parse")]
-    public async Task<ActionResult<Receipt>> Parse([FromBody] ParseReceiptRequest request, CancellationToken ct)
+    public async Task<ActionResult<Receipt>> Parse([FromBody] ParseReceiptRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.QrRaw))
-            return BadRequest("QrRaw is required.");
+        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdString is null)
+            return Unauthorized();
 
-        var receipt = await _receiptService.ParseAndSaveAsync(request.UserId, request.QrRaw, ct);
+        var userId = int.Parse(userIdString);
+
+        var receipt = await _receiptService.ParseAndSaveAsync(userId, request.QrRaw);
         return Ok(receipt);
     }
 

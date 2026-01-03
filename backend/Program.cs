@@ -1,5 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using backend;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Добавляем контроллеры
@@ -31,6 +35,26 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     // Наш сервис для чеков
 builder.Services.AddScoped<IReceiptService, ReceiptService>();
 
+//Добавляем аутентификейшон бикос электростейшон 
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 // 4. Включаем CORS
@@ -45,4 +69,8 @@ app.UseAuthorization();
 app.MapControllers();
 using (var scope = app.Services.CreateScope())
 
+app.UseAuthentication();   // обязательно перед UseAuthorization
+app.UseAuthorization();
+    
+    
 app.Run();
