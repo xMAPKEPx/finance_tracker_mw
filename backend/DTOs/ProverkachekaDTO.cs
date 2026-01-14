@@ -1,8 +1,15 @@
 ﻿
+using System.Text.Json;
+
 public class ProverkachekaRoot
 {
     public int Code { get; set; }
     public ProverkachekaData Data { get; set; } = null!;
+}
+public class ProverkachekaRootRaw
+{
+    public int Code { get; set; }
+    public JsonElement Data { get; set; }     
 }
 
 public class ProverkachekaData

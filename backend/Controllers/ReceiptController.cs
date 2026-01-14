@@ -20,14 +20,23 @@ public class ReceiptsController : ControllerBase
     [HttpPost("parse")]
     public async Task<ActionResult<Receipt>> Parse([FromBody] ParseReceiptRequest request)
     {
-        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userIdString is null)
-            return Unauthorized();
-
-        var userId = int.Parse(userIdString);
-
-        var receipt = await _receiptService.ParseAndSaveAsync(userId, request.QrRaw);
-        return Ok(receipt);
+        try
+        {
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                    if (userIdString is null)
+                        return Unauthorized();
+            
+                    var userId = int.Parse(userIdString);
+            
+                    var receipt = await _receiptService.ParseAndSaveAsync(userId, request.QrRaw);
+                    return Ok(receipt);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // сюда прилетят ошибки вида "Proverkacheka error (code ...): ..."
+            return BadRequest(new { error = ex.Message });
+        }
+        
     }
 
     [HttpGet("user/{userId}")]

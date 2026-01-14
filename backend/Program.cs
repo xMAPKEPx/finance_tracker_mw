@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Добавляем контроллеры
@@ -54,8 +55,11 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
-
+//Подрубаем авторизацию
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 var app = builder.Build();
+
 
 // 4. Включаем CORS
 app.UseCors("AllowAll");
@@ -65,12 +69,12 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
-app.UseAuthorization();
+
 app.MapControllers();
-using (var scope = app.Services.CreateScope())
 
 app.UseAuthentication();   // обязательно перед UseAuthorization
 app.UseAuthorization();
     
     
 app.Run();
+
