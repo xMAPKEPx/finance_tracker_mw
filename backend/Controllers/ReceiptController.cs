@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
-
+namespace backend;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -39,11 +39,13 @@ public class ReceiptsController : ControllerBase
         
     }
 
-    [HttpGet("user/{userId}")]
-    public async Task<ActionResult<List<Receipt>>> GetByUser(int userId, [FromServices] AppDbContext db, CancellationToken ct)
+    [HttpGet("user/Receipts")]
+    public async Task<ActionResult<List<Receipt>>> GetByUser([FromServices] AppDbContext db, CancellationToken ct)
     {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var receipts = await db.Receipts
             .Where(r => r.UserId == userId)
+            .Include(r => r.Items) //чтобы айтемы показывались
             .OrderByDescending(r => r.DateTime)
             .ToListAsync(ct);
 

@@ -58,16 +58,28 @@ builder.Services.AddAuthorization();
 //Подрубаем авторизацию
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// 4. Включаем CORS
+
+var corsPolicy = "_frontend";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(corsPolicy, policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
 var app = builder.Build();
 
 
-// 4. Включаем CORS
-app.UseCors("AllowAll");
 
 // 5. ВКЛЮЧАЕМ SWAGGER ВСЕГДА (убрав if)
 app.UseSwagger();
 app.UseSwaggerUI();
-
+app.UseCors(corsPolicy);//CORS активация
 app.UseHttpsRedirection();
 
 app.MapControllers();

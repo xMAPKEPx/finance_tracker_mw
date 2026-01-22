@@ -11,4 +11,5 @@ public class ReceiptItem
     public decimal Price { get; set; }      // рубли
     public decimal Quantity { get; set; }
     public decimal Sum { get; set; }        // рубли
+    public string? Category { get; set; } = null!;
 }
