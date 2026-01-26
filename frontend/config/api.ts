@@ -14,11 +14,23 @@ export const API_CONFIG = {
 export const API_ENDPOINTS = {
   // Auth
   auth: {
-    login: '/auth/login',
-    logout: '/auth/logout',
-    refresh: '/auth/refresh',
-    me: '/auth/me',
+    login: '/Auth/login',
+    register: '/Auth/register',
+    logout: '/Auth/logout',
+    refresh: '/Auth/refresh',
+    me: '/Auth/me',
   },
-  
+  // Categories
+  categories: {
+    list: '/Categories',
+    create: '/Categories',
+    delete: (id: string | number) => `/Categories/${id}`,
+  },
+  // Receipts
+  receipts: {
+    parse: '/Receipts/parse',
+    getUserReceipts: '/Receipts/user/Receipts',
+    debugRaw: '/Receipts/debug-raw',
+  },
 } as const;
 

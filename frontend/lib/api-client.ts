@@ -48,12 +48,15 @@ class ApiClient {
   /**
    * Создать заголовки запроса
    */
-  private getHeaders(customHeaders?: HeadersInit, customToken?: string): HeadersInit {
+  private getHeaders(customHeaders?: HeadersInit, customToken?: string, isFormData: boolean = false): HeadersInit {
     const token = this.getAuthToken(customToken);
 
     // Use Headers instance to safely set headers regardless of incoming HeadersInit shape
     const headers = new Headers();
-    headers.set('Content-Type', 'application/json');
+    // Не устанавливаем Content-Type для FormData, браузер сам установит с boundary
+    if (!isFormData) {
+      headers.set('Content-Type', 'application/json');
+    }
 
     if (customHeaders) {
       // customHeaders can be Headers, [string, string][], or Record<string, string>
@@ -153,10 +156,11 @@ class ApiClient {
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     const { token, ...requestOptions } = options;
+    const isFormData = requestOptions.body instanceof FormData;
     
     const config: RequestInit = {
       ...requestOptions,
-      headers: this.getHeaders(requestOptions.headers, token),
+      headers: this.getHeaders(requestOptions.headers, token, isFormData),
     };
 
     try {
@@ -187,10 +191,13 @@ class ApiClient {
    * POST запрос
    */
   async post<T>(endpoint: string, data?: unknown, options?: RequestInit): Promise<T> {
+    // Если data - это FormData, передаем напрямую без JSON.stringify
+    const body = data instanceof FormData ? data : (data ? JSON.stringify(data) : undefined);
+    
     return this.request<T>(endpoint, {
       ...options,
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
+      body,
     });
   }
 

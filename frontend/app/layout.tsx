@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Finance Tracker",
+  title: "CheckCheker",
   description: "Приложение для учёта финансов",
 };
 

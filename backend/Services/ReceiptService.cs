@@ -109,7 +109,7 @@ public class ReceiptService : IReceiptService
         }
         //var json1 = await resp.Content.ReadAsStringAsync(ct);
         Console.WriteLine("Before categorize, items: " + receipt.Items.Count);
-        await CategorizeReceiptItemsAsync(receipt.Items, userId);  
+        await CategorizeReceiptItemsAsync(receipt.Items, userId, ct);  
         Console.WriteLine("Before SaveChanges");
         _db.Receipts.Add(receipt);
         await _db.SaveChangesAsync(ct);
@@ -118,88 +118,53 @@ public class ReceiptService : IReceiptService
         return receipt;
         
     }
-public async Task CategorizeReceiptItemsAsync(List<ReceiptItem> items, int userId)
-{
-    var httpClient = _clientFactory.CreateClient();
-   // var categories = new[] { "еда", "транспорт", "развлечения", "одежда", "медицина", "быт", "другое" };
-    var categories = await GetOrCreateUserCategoriesAsync(userId);
-    var itemsForPrompt = items.Select(i => new { name = i.Name }).ToArray();
-    var itemsJson = JsonSerializer.Serialize(itemsForPrompt);
-    
-    // Промпт для gemma3:4b
-    var prompt = $@"Ты классификатор товаров из чеков. 
-ВЫБИРАЙ ТОЛЬКО ИЗ списка: {string.Join(", ", categories)}.
+    public async Task CategorizeReceiptItemsAsync(List<ReceiptItem> items, int userId, CancellationToken ct = default)
+    {
+        if (items == null || items.Count == 0) return;
 
-Товары: {itemsJson}
+        var categories = await GetOrCreateUserCategoriesAsync(userId, ct);
 
-Ответь ТОЛЬКО валидным JSON (без доп текста) по образцу:
+        var itemsForPrompt = items.Select(i => new { name = i.Name }).ToArray();
+        var itemsJson = JsonSerializer.Serialize(itemsForPrompt);
+
+        var prompt =
+            $@"Ты классификатор товаров из чеков.
+Категории: {string.Join(", ", categories)}.
+
+Товары (JSON-массив объектов с полем name):
+{itemsJson}
+
+Ответь ТОЛЬКО валидным JSON вида:
 {{
-  ""товары"": [
-    {{""name"": ""{itemsForPrompt[0].name}"", ""category"": ""(категория товара из списка)""}}
+  ""Products"": [
+    {{""Name"": ""..."", ""Category"": ""одна_из_категорий""}}
   ]
 }}";
 
-    // Запрос к Ollama
-    var requestBody = new
-    {
-        model = "gemma3:4b",
-        prompt = prompt,
-        format = "json",
-        stream = false
-    };
-    
-    var content = new StringContent(
-        JsonSerializer.Serialize(requestBody), 
-        Encoding.UTF8, 
-        "application/json");
-    
-    var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));  // 60 сек таймаут
-    
-    try
-    {{
-        var response = await httpClient.PostAsync(
-            "http://localhost:11434/api/generate", 
-            content, 
-            timeoutCts.Token);
-        
-        if (response.IsSuccessStatusCode)
-        {{
-            var ollamaJson = await response.Content.ReadAsStringAsync(timeoutCts.Token);
-            var ollamaResponse = JsonSerializer.Deserialize<OllamaApiResponse>(ollamaJson);
-            
-            if (!string.IsNullOrEmpty(ollamaResponse?.Response))
-            {{
-                var categorizationResult = JsonSerializer.Deserialize<CategorizationResult>(ollamaResponse.Response);
-                
-                // Применяем категории к items
-                if (categorizationResult?.Products != null)
-                {{
-                    foreach (var catItem in categorizationResult.Products)
-                    {{
-                        var receiptItem = items.FirstOrDefault(i => 
-                            i.Name.Contains(catItem.Name, StringComparison.OrdinalIgnoreCase));
-                        
-                        if (receiptItem != null)
-                        {{
-                            receiptItem.Category = catItem.Category ?? "другое";
-                        }}
-                    }}
-                }}
-            }}
-        }}
-    }}
-    catch (Exception ex)
-    {{
-        // Fallback: все в 'другое'
-        foreach (var item in items)
-        {{
-            item.Category ??= "другое";
-        }}
-        // Лог ошибки (опционально)
-        Console.WriteLine($"Категоризация Ollama упала: {ex.Message}");
-    }}
-}
+        var rawContent = await CallDeepseekAsync(prompt, ct);
+        Console.WriteLine("Raw content Example:");
+        Console.WriteLine(rawContent);
+        var jsonOnly   = ExtractJson(rawContent);
 
+        var result = JsonSerializer.Deserialize<CategorizationResult>(jsonOnly);
+
+        if (result?.Products == null) return;
+
+        foreach (var catItem in result.Products)
+        {
+            var receiptItem = items.FirstOrDefault(i =>
+                i.Name.Contains(catItem.Name, StringComparison.OrdinalIgnoreCase));
+
+            if (receiptItem != null)
+                receiptItem.Category = string.IsNullOrWhiteSpace(catItem.Category)
+                    ? "другое"
+                    : catItem.Category;
+        }
+    }
+
+
+
+//Созданмие пользовательских категорий
 private async Task<string[]> GetOrCreateUserCategoriesAsync(int userId, CancellationToken ct = default)
 {
     var userCats = await _db.UserCategories
@@ -247,4 +212,92 @@ private async Task<string[]> GetOrCreateUserCategoriesAsync(int userId, Cancella
 }
 
 
+
+
+//ПРИЗЫВ ДИПСИКА ДРЕВЛЯНАМИ
+public async Task<string> CallDeepseekAsync(string userPrompt, CancellationToken ct = default)
+{
+    var client = _clientFactory.CreateClient();
+
+    var body = new
+    {
+        model = "deepseek/deepseek-r1-0528:free",
+        messages = new[]
+        {
+            new { role = "user", content = userPrompt }
+        }
+    };
+
+    var json = JsonSerializer.Serialize(body);
+    using var request = new HttpRequestMessage(
+        HttpMethod.Post,
+        "https://openrouter.ai/api/v1/chat/completions")
+    {
+        Content = new StringContent(json, Encoding.UTF8, "application/json")
+    };
+
+    request.Headers.Add("Authorization", $"Bearer {_config["OpenRouter:ApiKey"]}");
+    request.Headers.Add("HTTP-Referer", "https://checkchecker.local");
+    request.Headers.Add("X-Title", "CheckChecker");
+
+    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+
+    using var response = await client.SendAsync(request, linkedCts.Token);
+    response.EnsureSuccessStatusCode();
+
+    var responseJson = await response.Content.ReadAsStringAsync(linkedCts.Token);
+
+    using var doc = JsonDocument.Parse(responseJson);
+    var content = doc.RootElement
+        .GetProperty("choices")[0]
+        .GetProperty("message")
+        .GetProperty("content")
+        .GetString();
+    return content;
+}
+
+//Извлечём джсон из Оупенроутер resppnse
+private static string ExtractJson(string content)
+{
+    if (string.IsNullOrWhiteSpace(content))
+        throw new InvalidOperationException("Пустой ответ модели");
+
+    content = content.Trim();
+
+    // 1) если есть <answer>...</answer> — берём то, что внутри
+    var answerStart = content.IndexOf("<answer>", StringComparison.OrdinalIgnoreCase);
+    var answerEnd   = content.IndexOf("</answer>", StringComparison.OrdinalIgnoreCase);
+    if (answerStart >= 0 && answerEnd > answerStart)
+    {
+        var inner = content.Substring(
+            answerStart + "<answer>".Length,
+            answerEnd - (answerStart + "<answer>".Length));
+        content = inner.Trim();
+    }
+
+    // 2) убираем markdown-код-блоки ```...``` и ```json ... ```
+    if (content.StartsWith("```"))
+    {
+        // срезаем первую строку ``` или ```json
+        var firstNewLine = content.IndexOf('\n');
+        if (firstNewLine > 0)
+            content = content.Substring(firstNewLine + 1);
+
+        // срезаем завершающее ```
+        var lastTicks = content.LastIndexOf("```", StringComparison.Ordinal);
+        if (lastTicks >= 0)
+            content = content.Substring(0, lastTicks);
+        content = content.Trim();
+    }
+
+    // 3) финальный трим
+    content = content.Trim();
+
+    // минимальная проверка
+    if (!content.StartsWith("{") && !content.StartsWith("["))
+        throw new InvalidOperationException($"Ответ не похож на JSON: '{content[..Math.Min(50, content.Length)]}...'");
+
+    return content;
+}
 }

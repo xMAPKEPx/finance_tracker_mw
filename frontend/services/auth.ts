@@ -1,6 +1,6 @@
 import { Credentials, UserProfile } from "@/types/auth";
 import { apiClient } from "@/lib/api-client";
-import { API_ENDPOINTS } from "@/config/api";
+import { API_ENDPOINTS, API_CONFIG } from "@/config/api";
 import { withApiFallback, shouldUseMockData } from "@/lib/api-utils";
 
 const mockUsers: Array<UserProfile & { username: string; password: string }> = [
@@ -8,11 +8,26 @@ const mockUsers: Array<UserProfile & { username: string; password: string }> = [
     id: "u1",
     displayName: "Куратор Банка",
     email: "user@urfu.ru",
-    username: "mapkeeeeee",
+    username: "curator",
     password: "pass123",
   },
   {
     id: "u2",
+    displayName: "Студент",
+    email: "student@urfu.ru",
+    username: "student",
+    password: "pass123",
+  },
+  // Старые учетные данные для обратной совместимости
+  {
+    id: "u3",
+    displayName: "Куратор Банка",
+    email: "user@urfu.ru",
+    username: "mapkeeeeee",
+    password: "pass123",
+  },
+  {
+    id: "u4",
     displayName: "Димасик",
     email: "student@urfu.ru",
     username: "Woodzeii",
@@ -59,11 +74,55 @@ export async function mockLogout(): Promise<void> {
 
 // ========== API функции ==========
 async function apiLogin(credentials: Credentials): Promise<{ token: string; user: UserProfile }> {
-  const response = await apiClient.post<{ token: string; user: UserProfile }>(
+  // Бэкенд возвращает только { token: "..." }
+  const response = await apiClient.post<{ token: string }>(
     API_ENDPOINTS.auth.login,
     credentials
   );
-  return response;
+  
+  // Получаем данные пользователя через /Auth/me, используя полученный токен
+  const user = await apiGetMeWithToken(response.token);
+  
+  return {
+    token: response.token,
+    user,
+  };
+}
+
+// Вспомогательная функция для получения данных пользователя с токеном
+// Создаем временный запрос с токеном до сохранения в localStorage
+async function apiGetMeWithToken(token: string): Promise<UserProfile> {
+  // Используем прямой fetch с токеном, так как apiClient может еще не знать о токене
+  const response = await fetch(`${API_CONFIG.baseURL}${API_ENDPOINTS.auth.me}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Ошибка получения данных пользователя' }));
+    throw new Error(error.message || 'Ошибка получения данных пользователя');
+  }
+
+  return await response.json();
+}
+
+async function apiRegister(credentials: Credentials): Promise<{ token: string; user: UserProfile }> {
+  // Бэкенд возвращает только { token: "..." }
+  const response = await apiClient.post<{ token: string }>(
+    API_ENDPOINTS.auth.register,
+    credentials
+  );
+  
+  // Получаем данные пользователя через /Auth/me, используя полученный токен
+  const user = await apiGetMeWithToken(response.token);
+  
+  return {
+    token: response.token,
+    user,
+  };
 }
 
 async function apiLogout(): Promise<void> {
@@ -77,13 +136,32 @@ async function apiGetMe(): Promise<UserProfile> {
 // ========== Публичные функции (с автоматическим выбором моков/API) ==========
 /**
  * Вход в систему
- * Автоматически использует API или моки в зависимости от конфигурации
+ * Использует API если настроен, иначе моки
+ * Если API возвращает ошибку - пробрасывает её (не переключается на моки)
  */
 export async function login(credentials: Credentials): Promise<{ token: string; user: UserProfile }> {
-  return withApiFallback(
-    () => apiLogin(credentials),
-    () => mockLogin(credentials)
-  );
+  // Если нужно использовать моки, используем их
+  if (shouldUseMockData()) {
+    return mockLogin(credentials);
+  }
+  
+  // Если API настроен, используем его и пробрасываем ошибки
+  return apiLogin(credentials);
+}
+
+/**
+ * Регистрация нового пользователя
+ * Использует API если настроен, иначе моки
+ * Если API возвращает ошибку - пробрасывает её (не переключается на моки)
+ */
+export async function register(credentials: Credentials): Promise<{ token: string; user: UserProfile }> {
+  // Если нужно использовать моки, используем их
+  if (shouldUseMockData()) {
+    return mockLogin(credentials); // Используем mockLogin для моков при регистрации
+  }
+  
+  // Если API настроен, используем его и пробрасываем ошибки
+  return apiRegister(credentials);
 }
 
 /**

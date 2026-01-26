@@ -3,7 +3,7 @@ import type { AuthState, Credentials } from "@/types/auth";
 import { login as authLogin, logout as authLogout } from "@/services/auth";
 
 const initialState: AuthState = {
-  isAuthenticated: true,
+  isAuthenticated: false,
   status: "idle",
 };
 
