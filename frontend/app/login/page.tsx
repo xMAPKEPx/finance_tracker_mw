@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { login } from "@/store/slices/authSlice";
 import { Credentials } from "@/types/auth";
 import { useRouter } from "next/navigation";
+import AuthMenu from "@/components/AuthMenu";
 
 export default function LoginPage() {
   const dispatch = useAppDispatch();
@@ -45,14 +46,16 @@ export default function LoginPage() {
   const isLoading = authStatus === "loading";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <AuthMenu />
+      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Вход в систему
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Finance Tracker
+            CheckCheker
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -117,6 +120,7 @@ export default function LoginPage() {
             </div>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );

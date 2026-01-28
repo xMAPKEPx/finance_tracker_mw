@@ -16,3 +16,9 @@ public class DefaultCategories
                 "еда", "транспорт", "развлечения", "одежда", "медицина", "быт", "другое"
         };
 }
+public class Category
+{
+        public int Id { get; set; }
+        public string Name { get; set; } = null!;
+}
+

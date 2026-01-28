@@ -5,6 +5,11 @@ public class OllamaApiResponse
      public string Response { get; set; } = "";
 }
 
+public class OpenRouterResponse
+{
+     public string Response { get; set; } = "";
+}
+
 public class CategorizationResult
 {
      public List<CategorizedItem> Products { get; set; } = new();

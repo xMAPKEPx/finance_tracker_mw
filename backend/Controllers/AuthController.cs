@@ -6,8 +6,10 @@ using Microsoft.EntityFrameworkCore;
 using System.Text;
 using BCrypt.Net;
 using Microsoft.Extensions.Configuration;
-
-
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+namespace backend;
 [ApiController]
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
@@ -33,9 +35,9 @@ public class AuthController : ControllerBase
     }
     
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    [AllowAnonymous]
+    public async Task<ActionResult<LoginResponse>> Register([FromBody] RegisterRequest request)
     {
-        // проверка на уникальность логина
         var exists = await _context.Users.AnyAsync(u => u.Login == request.Login);
         if (exists)
             return BadRequest("Пользователь с таким логином уже существует");
@@ -50,10 +52,14 @@ public class AuthController : ControllerBase
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
-        return Ok();
+        // СРАЗУ генерим JWT
+        var token = GenerateJwtToken(user);
+
+        return Ok(new LoginResponse { Token = token });
     }
 
     [HttpPost("login")]
+    [AllowAnonymous]
     public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request)
     {
         var user = await _context.Users
@@ -95,4 +101,23 @@ public class AuthController : ControllerBase
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     } 
+        [HttpGet("me")]
+        [Authorize]
+        public IActionResult Me()
+        {
+            // Получаем данные из токена
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userName = User.Identity?.Name;
+            var email = User.FindFirstValue(ClaimTypes.Email);
+    
+            if (userId == null)
+                return Unauthorized();
+    
+            return Ok(new
+            {
+                id = userId,
+                displayName = userName,
+                email = email
+            });
+        }
 }

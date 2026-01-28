@@ -4,89 +4,65 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Добавляем контроллеры
+// Services (ДО Build)
 builder.Services.AddControllers();
-
-// 2. Включаем Swagger (ДАЖЕ ЕСЛИ НЕ В РЕЖИМЕ РАЗРАБОТКИ)
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen();  // Один раз
 
-// 3. Настраиваем CORS
+// CORS (одна политика)
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("_frontend", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy
+            .SetIsOriginAllowed(origin =>
+                new Uri(origin).Host == "localhost")
+            .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowAnyHeader();
+            .AllowCredentials();
     });
 });
-// HttpClient для proverkacheka
+// Db, HttpClient, Services...
 builder.Services.AddHttpClient("Proverkacheka");
-
 builder.Services.AddDbContext<AppDbContext>(options =>
-{
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-    options.UseSqlite(connectionString);
-});
-
-    // Наш сервис для чеков
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IReceiptService, ReceiptService>();
 
-//Добавляем аутентификейшон бикос электростейшон 
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
+// JWT (один раз)
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => {
+        options.TokenValidationParameters = new TokenValidationParameters {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
         };
     });
-
 builder.Services.AddAuthorization();
-//Подрубаем авторизацию
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
-// 4. Включаем CORS
-
-var corsPolicy = "_frontend";
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy(corsPolicy, policy =>
-    {
-        policy.WithOrigins("http://localhost:3000")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
 var app = builder.Build();
 
+// Middleware (порядок критичен!)
+if (app.Environment.IsDevelopment()) {  // Или всегда для Swagger
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
-
-// 5. ВКЛЮЧАЕМ SWAGGER ВСЕГДА (убрав if)
-app.UseSwagger();
-app.UseSwaggerUI();
-app.UseCors(corsPolicy);//CORS активация
 app.UseHttpsRedirection();
 
+// CORS ПЕРВЫЙ!
+app.UseCors("_frontend");
+
+// Auth ДО контроллеров
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Контроллеры ПОСЛЕДНИМИ
 app.MapControllers();
 
-app.UseAuthentication();   // обязательно перед UseAuthorization
-app.UseAuthorization();
-    
-    
 app.Run();
-
